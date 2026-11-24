@@ -1,0 +1,52 @@
+[project]
+name = "docqa-agent"
+version = "0.1.0"
+description = "Read-only MCP server that exposes DocQA's pgvector document corpus to any MCP client"
+readme = "README.md"
+authors = [{ name = "Jasraj Gosal" }]
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.32.0",
+    "mcp>=2.3.0",
+    "openai>=3.58.0",
+    "pydantic>=2.14.4",
+    "pydantic-settings>=2.16.3",
+]
+
+[project.scripts]
+docqa-mcp = "docqa_agent.server:main"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "asyncpg-stubs>=0.32.0",
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "rfc3339-validator>=0.1.4",
+    "ruff>=0.17.6",
+    "testcontainers[postgres]>=4.15.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "ASYNC", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: needs a real database and OpenAI key (skipped otherwise)"]

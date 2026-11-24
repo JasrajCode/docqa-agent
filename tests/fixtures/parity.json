@@ -1,0 +1,122 @@
+[
+  {
+    "query": "What problem does retrieval-augmented generation solve?",
+    "user_id": "cmnmktd7w000001m58wwc886p",
+    "document_id": "cmomi59eu000001u8zel1ajk9",
+    "top_k": 8,
+    "results": [
+      {
+        "id": "2aa52635-2afb-488d-818c-3ed5934d25e5",
+        "similarity": 0.5997066058040476
+      },
+      {
+        "id": "df3282a6-b66e-4fd7-966c-7b2d5ff66103",
+        "similarity": 0.5854225548974556
+      },
+      {
+        "id": "afd9a402-1d2b-4019-9a44-c6646b6aac79",
+        "similarity": 0.5819129602580178
+      },
+      {
+        "id": "4cfa2fb0-b611-434d-8e70-d440b43011db",
+        "similarity": 0.5739974901485189
+      },
+      {
+        "id": "03de8c04-58ed-4681-9d22-be92e69fe37a",
+        "similarity": 0.5654381552236896
+      },
+      {
+        "id": "dd1ef7e5-01cd-4b82-840a-bcb2cac3d3e1",
+        "similarity": 0.5616408555149396
+      },
+      {
+        "id": "77c152c7-1813-4a30-bb82-f2e114960b14",
+        "similarity": 0.5495902864980613
+      },
+      {
+        "id": "c65cfecb-c3d8-4c8c-b7b7-dbc34d06923a",
+        "similarity": 0.5454863924295074
+      }
+    ]
+  },
+  {
+    "query": "Which datasets were used in the experiments?",
+    "user_id": "cmnmktd7w000001m58wwc886p",
+    "document_id": "cmomi59eu000001u8zel1ajk9",
+    "top_k": 8,
+    "results": [
+      {
+        "id": "f4a2747d-643a-472d-9570-04535c72bc1f",
+        "similarity": 0.46010765692689404
+      },
+      {
+        "id": "5f051a8d-23a6-436b-a352-fefc942938c2",
+        "similarity": 0.44961135508766525
+      },
+      {
+        "id": "8413fd92-b09c-475a-aef6-50649d15ec58",
+        "similarity": 0.4489132669416813
+      },
+      {
+        "id": "f37f4b62-41fa-4add-9d1d-949c9e5d7648",
+        "similarity": 0.4412120923879592
+      },
+      {
+        "id": "e85b23ad-29f7-4e0f-b096-ae62af090b82",
+        "similarity": 0.41978836572789735
+      },
+      {
+        "id": "0d60b313-5677-41a9-b652-84b1d27719a2",
+        "similarity": 0.4118144629598398
+      },
+      {
+        "id": "85fec453-861b-4a9b-9f3c-689f326b3b1f",
+        "similarity": 0.4102682704171158
+      },
+      {
+        "id": "885caa64-41b1-4f8a-96a5-a7e88b5f9a45",
+        "similarity": 0.40558640152676984
+      }
+    ]
+  },
+  {
+    "query": "How is the retriever trained?",
+    "user_id": "cmnmktd7w000001m58wwc886p",
+    "document_id": "cmomi59eu000001u8zel1ajk9",
+    "top_k": 8,
+    "results": [
+      {
+        "id": "77c152c7-1813-4a30-bb82-f2e114960b14",
+        "similarity": 0.49138701913202254
+      },
+      {
+        "id": "4cfa2fb0-b611-434d-8e70-d440b43011db",
+        "similarity": 0.4126129026931442
+      },
+      {
+        "id": "b5e84010-0aef-47b8-a71d-f3ca7d8cea4c",
+        "similarity": 0.40690148151613426
+      },
+      {
+        "id": "e4577f89-b4ca-4e15-bf65-ecd37192cc5f",
+        "similarity": 0.40077679818909107
+      },
+      {
+        "id": "34dee075-dd72-4fd5-bbc0-62796d4060ad",
+        "similarity": 0.38372116169877524
+      },
+      {
+        "id": "03de8c04-58ed-4681-9d22-be92e69fe37a",
+        "similarity": 0.3804098125148141
+      },
+      {
+        "id": "afd9a402-1d2b-4019-9a44-c6646b6aac79",
+        "similarity": 0.37529607095966677
+      },
+      {
+        "id": "8413fd92-b09c-475a-aef6-50649d15ec58",
+        "similarity": 0.37073208556215986
+      }
+    ]
+  }
+]
