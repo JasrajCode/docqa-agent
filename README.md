@@ -96,6 +96,12 @@ event: result
 data: {"question": "...", "answer": "... [b06787ae-...]", "citations": [...], "approved": true, ...}
 ```
 
+For readable output, [scripts/ask_live.py](scripts/ask_live.py) prints each step with its timing as it arrives, then the answer with numbered sources. It uses only the standard library, and `DOCQA_API_KEY` adds the `X-API-Key` header:
+
+```bash
+uv run python scripts/ask_live.py "How does RAG-Token differ from RAG-Sequence?"
+```
+
 To run it locally:
 
 ```bash

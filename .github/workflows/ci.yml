@@ -57,6 +57,11 @@ jobs:
       DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
 
     steps:
+      - name: Warn that the deploy was skipped
+        # A skipped step still reports success, so the run summary needs a visible notice
+        if: env.DEPLOY_HOOK == ''
+        run: echo "::warning title=Deploy skipped::RENDER_DEPLOY_HOOK is not set, so nothing was deployed"
+
       - name: Trigger Render deploy hook
         # Skipped until the secret is set, so CI stays green before the service exists
         if: env.DEPLOY_HOOK != ''
