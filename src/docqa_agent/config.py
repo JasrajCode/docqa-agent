@@ -36,3 +36,21 @@ class AgentSettings(BaseSettings):
 
     eval_judge_model: str | None = None  # defaults to agent_model
     eval_single_pass_k: int = 8
+
+
+class ApiSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # Requests with one of these keys in X-API-Key skip the rate limits.
+    api_keys: Annotated[list[str], NoDecode] = []
+    rate_limit_per_hour: int = 5
+    daily_question_cap: int = 100
+    # Proxies in front of the app that append to X-Forwarded-For (1 on Render).
+    trusted_proxy_hops: int = 1
+
+    @field_validator("api_keys", mode="before")
+    @classmethod
+    def _split_keys(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value

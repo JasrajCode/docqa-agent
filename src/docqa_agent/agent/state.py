@@ -61,6 +61,12 @@ class AgentResult(BaseModel):
     evidence: list[ChunkHit]
 
 
+class Progress(BaseModel):
+    step: str
+    message: str
+    queries: list[str] = []
+
+
 def merge_evidence(current: dict[str, ChunkHit], new: dict[str, ChunkHit]) -> dict[str, ChunkHit]:
     return {**current, **new}
 

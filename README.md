@@ -2,16 +2,22 @@
 
 A read-only [MCP](https://modelcontextprotocol.io) server that lets any MCP client, such as Claude Code, Claude Desktop or your own agent, search the PDF documents indexed by [DocQA](https://github.com/JasrajCode/docqa).
 
-It reads the same Postgres + pgvector tables that DocQA writes, so an AI assistant gets DocQA's semantic search as a set of tools it can call. The repo also includes `docqa-ask`, a LangGraph agent that answers questions through the server and has every claim checked against its sources.
+It reads the same Postgres + pgvector tables that DocQA writes, so an AI assistant gets DocQA's semantic search as a set of tools it can call. On top of the server sits a LangGraph agent that answers questions and has every claim checked against its sources. The agent is available as a CLI (`docqa-ask`) and as a rate-limited HTTP API that streams its progress, packaged with Docker and deployed on Render.
 
-```
-Claude Code / Claude Desktop / your agent
-            │  MCP over stdio
-            ▼
-       docqa-agent ───────► OpenAI (embeds the search query)
-            │  read-only Postgres role
-            ▼
-  Neon Postgres + pgvector ◄── DocQA (writes chunks and embeddings)
+```mermaid
+graph TD
+    client([Browser or curl]) -- "HTTPS, Server-Sent Events" --> api
+    subgraph container ["docqa-agent container on Render"]
+        api["FastAPI: /ask, /ask/stream, rate limits"] --> agent[LangGraph agent]
+        agent -- "MCP, in-process" --> server[MCP server]
+    end
+    desktop([Claude Code or Claude Desktop]) -- "MCP over stdio" --> local["MCP server (docqa-mcp)"]
+    agent -- "plan, write, review" --> claude[(Claude API)]
+    server -- "embed query" --> openai[(OpenAI embeddings)]
+    local -- "embed query" --> openai
+    server -- "read-only role" --> neon[(Neon Postgres + pgvector)]
+    local -- "read-only role" --> neon
+    docqa([DocQA web app]) -- "writes chunks and embeddings" --> neon
 ```
 
 ## Tools
@@ -55,9 +61,52 @@ uv run docqa-ask "Which datasets were used to evaluate RAG?"
 uv run docqa-ask --json "Which datasets were used to evaluate RAG?"
 ```
 
-All three LLM roles use one Claude model (`AGENT_MODEL`, Claude Haiku by default) with pydantic-validated structured outputs. The agent reaches the server through mcp's own client over a single stdio session per run. `langchain-mcp-adapters` was the original plan, but it requires mcp below 2.0 and this server is built on mcp 2.
+All three LLM roles use one Claude model (`AGENT_MODEL`, Claude Haiku by default) with pydantic-validated structured outputs. The agent always reaches the server through mcp's own client: the CLI launches it over stdio, and the API runs it in the same process, so both paths exercise the real MCP protocol. `langchain-mcp-adapters` was the original plan, but it requires mcp below 2.0 and this server is built on mcp 2.
 
 To trace runs, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env`. Each run then appears in LangSmith with every node's inputs, outputs, latency and token usage.
+
+## HTTP API
+
+`docqa_agent.api` serves the agent over HTTP with FastAPI. Interactive docs are at `/docs`.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Liveness check for the platform; makes no external calls |
+| `POST /ask` | Runs the agent and returns the answer, citations, searches and review outcome as JSON |
+| `POST /ask/stream` | Same run, streamed as Server-Sent Events: a `progress` event as each node finishes, then a `result` event (or an `error` event) |
+
+```bash
+curl -N -X POST https://YOUR-SERVICE.onrender.com/ask/stream   -H "content-type: application/json"   -d '{"question": "What datasets does the RAG paper evaluate on?"}'
+```
+
+```
+event: progress
+data: {"step": "planner", "message": "Planned 1 search", "queries": ["What datasets does the RAG paper evaluate on?"]}
+
+event: progress
+data: {"step": "retriever", "message": "Retrieved 8 new passages", "queries": []}
+
+event: progress
+data: {"step": "writer", "message": "Drafted an answer", "queries": []}
+
+event: progress
+data: {"step": "reviewer", "message": "Reviewer approved the draft", "queries": []}
+
+event: result
+data: {"question": "...", "answer": "... [b06787ae-...]", "citations": [...], "approved": true, ...}
+```
+
+To run it locally:
+
+```bash
+uv run uvicorn --factory docqa_agent.api:create_production_app --reload
+```
+
+**Streaming progress, not tokens.** An agent run takes 10 to 20 seconds, and most of that is spent in steps whose output is structured JSON rather than prose. Streaming LangGraph's per-node updates (`stream_mode="updates"`) shows what the agent is doing as it happens; streaming the writer's tokens would show text the reviewer might still reject.
+
+**Every question costs money, so the API is rate limited.** Each client gets 5 questions per hour, and all clients together get 100 per day. The client is identified by the `X-Forwarded-For` entry that Render's proxy appended, counted from the right, because entries to its left are whatever the client sent and could be changed on every request. A request with a key from `API_KEYS` in the `X-API-Key` header skips the limits, and keys are compared in constant time. The counters live in memory, which is correct for one instance but resets whenever the free-tier service sleeps, so the hard ceiling on spend is the monthly limit set in the Anthropic console.
+
+**Failures don't leak internals.** If the agent raises, the full traceback goes to the server log and the client gets a generic 502 (or an `error` event when streaming). The response also omits the raw retrieved passages, which can be large; citations carry the document title and chunk index instead.
 
 ## Evaluation
 
@@ -150,6 +199,20 @@ Claude Desktop (`claude_desktop_config.json`):
 
 Then ask something like "What datasets does the RAG paper use? Cite the chunks."
 
+## Deploy
+
+The Docker image installs only locked runtime dependencies (`uv sync --locked --no-dev`) in a layer cached separately from the source, compiles bytecode at build time and runs as a non-root user. Under a 512 MB memory limit it peaks at about 160 MB while answering.
+
+To deploy on Render's free tier:
+
+1. Create a **Web Service** from this repository with the **Docker** runtime and the **Free** instance type.
+2. Add the environment variables from `.env.example`: `DATABASE_URL` (the read-only role), `OPENAI_API_KEY`, `DOCQA_SCOPE_USER_IDS`, `ANTHROPIC_API_KEY`, and optionally `API_KEYS` and the `LANGSMITH_*` variables. Render sets `PORT` itself.
+3. Set the health check path to `/health`.
+4. Turn **Auto-Deploy** off, copy the service's **Deploy Hook** URL, and add it to the GitHub repository as the `RENDER_DEPLOY_HOOK` secret. CI then deploys only after every check passes on `main`.
+5. In the Anthropic console, set a monthly spend limit on the key's workspace.
+
+Free services sleep after 15 minutes without traffic, so the first request after a quiet period waits roughly a minute while the container starts. Later requests take the normal 10 to 20 seconds.
+
 ## Development
 
 ```bash
@@ -174,9 +237,10 @@ uv run pyright
 | `test_eval_dataset.py` | The bundled dataset is valid; malformed cases are rejected |
 | `test_eval_systems.py` | The single-pass baseline and its fabricated-citation detection |
 | `test_agent_mcp.py` | The agent's MCP client against the real server, including a full agent run |
+| `test_api.py` | The HTTP API: responses, validation, per-client and daily limits, forged `X-Forwarded-For` entries, API key bypass, the SSE event sequence, and failures that don't leak details |
 | `test_agent_live.py` | One full run with real Claude calls (skipped without `ANTHROPIC_API_KEY`) |
 
-CI runs lint, format check, type check and tests on every push and pull request.
+CI runs lint, format check, type check and tests on every push and pull request, and builds the Docker image. On `main`, a deploy job waits for both and then triggers the Render deploy hook; it is skipped while the `RENDER_DEPLOY_HOOK` secret is unset.
 
 ## Parity test
 

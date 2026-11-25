@@ -33,3 +33,32 @@ jobs:
       - name: Tests
         # The tests start a pgvector container, which works because GitHub's Ubuntu runners ship Docker
         run: uv run pytest
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t docqa-agent .
+
+      - name: Import the app inside the image
+        # Catches missing modules or a broken entry point without needing credentials
+        run: docker run --rm docqa-agent python -c "import docqa_agent.api"
+
+  deploy:
+    name: Deploy to Render
+    needs: [checks, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+    steps:
+      - name: Trigger Render deploy hook
+        # Skipped until the secret is set, so CI stays green before the service exists
+        if: env.DEPLOY_HOOK != ''
+        # -f: fail the job on an HTTP error response
+        run: curl -fsS -X POST "$DEPLOY_HOOK"

@@ -1,14 +1,23 @@
 import asyncio
 import re
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from docqa_agent.agent.reasoner import Reasoner
 from docqa_agent.agent.search import Searcher
-from docqa_agent.agent.state import AgentResult, AgentState, Citation, Draft, NextStep, Review
+from docqa_agent.agent.state import (
+    AgentResult,
+    AgentState,
+    Citation,
+    Draft,
+    NextStep,
+    Progress,
+    Review,
+)
 from docqa_agent.models import ChunkHit
 
 INLINE_CITATION = re.compile(r"\[([^\[\]\s]+)\]")
@@ -142,11 +151,52 @@ def build_graph(
     return graph.compile()
 
 
+def _initial_state(question: str) -> AgentState:
+    return {"question": question, "evidence": {}, "searched": [], "revisions": 0}
+
+
+def _config(metadata: dict[str, Any] | None) -> RunnableConfig:
+    return {"run_name": "docqa-agent", "metadata": metadata or {}}
+
+
 async def answer_question(
     graph: CompiledStateGraph, question: str, *, metadata: dict[str, Any] | None = None
 ) -> AgentResult:
-    initial: AgentState = {"question": question, "evidence": {}, "searched": [], "revisions": 0}
-    final = await graph.ainvoke(
-        initial, config={"run_name": "docqa-agent", "metadata": metadata or {}}
-    )
+    final = await graph.ainvoke(_initial_state(question), config=_config(metadata))
     return final["result"]
+
+
+def describe_step(node: str, update: dict[str, Any]) -> Progress:
+    if node == "planner":
+        queries = update.get("queries", [])
+        noun = "search" if len(queries) == 1 else "searches"
+        return Progress(step=node, message=f"Planned {len(queries)} {noun}", queries=queries)
+    if node == "retriever":
+        found = len(update.get("evidence", {}))
+        return Progress(step=node, message=f"Retrieved {found} new passages")
+    if node == "writer":
+        return Progress(step=node, message="Drafted an answer")
+    review: Review | None = update.get("review")
+    if review and review.approved:
+        message = "Reviewer approved the draft"
+    elif update.get("next_step") == "retriever":
+        message = "Reviewer requested more searches"
+    elif update.get("next_step") == "writer":
+        message = "Reviewer requested a rewrite"
+    else:
+        message = "Revision limit reached"
+    return Progress(step=node, message=message)
+
+
+async def stream_answer(
+    graph: CompiledStateGraph, question: str, *, metadata: dict[str, Any] | None = None
+) -> AsyncIterator[Progress | AgentResult]:
+    """Yields a Progress event as each node finishes, then the final AgentResult."""
+    async for chunk in graph.astream(
+        _initial_state(question), config=_config(metadata), stream_mode="updates"
+    ):
+        for node, update in chunk.items():
+            if node == "finalize":
+                yield update["result"]
+            else:
+                yield describe_step(node, update)
