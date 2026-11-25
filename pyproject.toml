@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 docqa-mcp = "docqa_agent.server:main"
 docqa-ask = "docqa_agent.agent.cli:main"
+docqa-eval = "docqa_agent.evals.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.9,<0.14.0"]

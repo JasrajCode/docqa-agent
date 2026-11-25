@@ -30,7 +30,9 @@ def format_result(result: AgentResult) -> str:
         f"  [{c.chunk_id}] {c.document_title}, chunk {c.chunk_index}" for c in result.citations
     ] or ["  (none)"]
     revisions = f"{result.revisions} revision{'s' if result.revisions != 1 else ''}"
-    if result.approved:
+    if result.approved is None:
+        lines += ["", "Reviewer: not run"]
+    elif result.approved:
         lines += ["", f"Reviewer: approved after {revisions}"]
     else:
         lines += ["", f"Reviewer: not approved after {revisions}. Unsupported claims:"]

@@ -1,0 +1,166 @@
+[
+  {
+    "id": "rag-knowledge-source",
+    "question": "What knowledge source does RAG use as its non-parametric memory?",
+    "gold_quotes": ["we use the December 2018 dump"],
+    "reference_answer": "A Wikipedia dump from December 2018."
+  },
+  {
+    "id": "rag-document-count",
+    "question": "How is Wikipedia split into documents for RAG's index, and how many documents does that produce?",
+    "gold_quotes": ["100-word chunks, to make a total of 21M documents"],
+    "reference_answer": "Each article is split into disjoint 100-word chunks, giving about 21 million documents."
+  },
+  {
+    "id": "rag-generator",
+    "question": "Which model is RAG's generator, and how many parameters does it have?",
+    "gold_quotes": ["pre-trained seq2seq transformer [58] with 400M parameters"],
+    "reference_answer": "BART-large, a pre-trained seq2seq transformer with 400M parameters."
+  },
+  {
+    "id": "rag-retriever",
+    "question": "Which retriever does RAG use, and what architecture does it follow?",
+    "gold_quotes": ["DPR follows a bi-encoder architecture"],
+    "reference_answer": "Dense Passage Retriever (DPR), which follows a bi-encoder architecture."
+  },
+  {
+    "id": "rag-search-index",
+    "question": "What library and approximation does RAG use to build its document search index?",
+    "gold_quotes": ["build a single MIPS index using FAISS"],
+    "reference_answer": "A single MIPS index built with FAISS, using a Hierarchical Navigable Small World approximation for fast retrieval."
+  },
+  {
+    "id": "rag-frozen-encoder",
+    "question": "Which parts of RAG's retriever are updated during fine-tuning, and why?",
+    "gold_quotes": ["keep the document encoder (and index) fixed, only fine-tuning the query encoder"],
+    "reference_answer": "Only the query encoder is fine-tuned. The document encoder and index stay fixed, because updating them would require periodically rebuilding the index and was not needed for strong performance."
+  },
+  {
+    "id": "rag-variants",
+    "question": "What is the difference between RAG-Sequence and RAG-Token?",
+    "gold_quotes": ["uses the same retrieved document to generate", "can draw a different latent document for each"],
+    "reference_answer": "RAG-Sequence uses the same retrieved document to generate the whole output sequence, while RAG-Token can use a different retrieved document for each generated token."
+  },
+  {
+    "id": "rag-retrieved-k",
+    "question": "How many documents does RAG retrieve per query during training?",
+    "gold_quotes": ["{5,10}for training"],
+    "reference_answer": "Either 5 or 10 documents (k is 5 or 10)."
+  },
+  {
+    "id": "rag-bm25",
+    "question": "How did a BM25 retriever compare with RAG's learned dense retriever?",
+    "gold_quotes": ["For FEVER, BM25 performs best"],
+    "reference_answer": "BM25 did best on FEVER, likely because its claims are entity-centric, but the learned dense retriever was better on all other tasks, especially open-domain question answering."
+  },
+  {
+    "id": "rag-index-hot-swap",
+    "question": "How did the authors show that RAG's knowledge can be updated without retraining?",
+    "gold_quotes": ["RAG answers 70% correctly using the 2016 index"],
+    "reference_answer": "They swapped in a December 2016 Wikipedia index in place of the December 2018 one. RAG answered about 70% of questions about 2016 world leaders correctly with the 2016 index and 68% about 2018 leaders with the 2018 index, while accuracy with mismatched indices was very low."
+  },
+  {
+    "id": "rag-human-eval-factuality",
+    "question": "In the human evaluation of Jeopardy question generation, how often was RAG judged more factual than BART?",
+    "gold_quotes": ["Evaluators indicated that BART was more factual"],
+    "reference_answer": "RAG was judged more factual in 42.7% of cases versus 7.1% for BART, and both were factual in a further 17% of cases."
+  },
+  {
+    "id": "rag-jeopardy-variant",
+    "question": "Which RAG variant performs better on Jeopardy question generation?",
+    "gold_quotes": ["RAG-Token performs better than RAG-Sequence on Jeopardy question generation"],
+    "reference_answer": "RAG-Token performs better than RAG-Sequence."
+  },
+  {
+    "id": "rag-training-hardware",
+    "question": "What hardware were the RAG models trained on?",
+    "gold_quotes": ["8, 32GB NVIDIA V100 GPUs"],
+    "reference_answer": "Mixed-precision training across 8 NVIDIA V100 GPUs with 32GB each, although training and inference can run on a single GPU."
+  },
+  {
+    "id": "rag-index-memory",
+    "question": "How much memory does RAG's document index need, and how was that reduced?",
+    "gold_quotes": ["reducing the CPU memory requirement to 36GB"],
+    "reference_answer": "About 100GB of CPU memory for all of Wikipedia, reduced to 36GB with FAISS compression."
+  },
+  {
+    "id": "rag-retrieval-collapse",
+    "question": "What is retrieval collapse, and on which task did the authors observe it?",
+    "gold_quotes": ["learn to retrieve the same documents regardless of the"],
+    "reference_answer": "On tasks such as story generation, the retriever learned to return the same documents regardless of the input, so the generator ignored them and RAG performed like BART."
+  },
+  {
+    "id": "rag-risks",
+    "question": "What potential downsides of RAG do the authors discuss?",
+    "gold_quotes": ["faked or misleading content"],
+    "reference_answer": "External knowledge sources such as Wikipedia are never fully factual or unbiased, and like GPT-2, RAG could be misused to generate abuse, fake or misleading content, impersonate others or automate spam and phishing. It may also contribute to automating jobs."
+  },
+  {
+    "id": "rag-decoding",
+    "question": "Which decoding approach is used for RAG-Sequence on Open-MSMarco and Jeopardy, and why?",
+    "gold_quotes": ["use the Fast Decoding approach for RAG-Sequence models"],
+    "reference_answer": "Fast Decoding, because Thorough Decoding did not improve performance."
+  },
+  {
+    "id": "rag-multi-generator-and-source",
+    "question": "Which generator model does RAG use, and which Wikipedia dump serves as its knowledge source?",
+    "gold_quotes": ["pre-trained seq2seq transformer [58] with 400M parameters", "we use the December 2018 dump"],
+    "match": "all",
+    "reference_answer": "BART-large (400M parameters) as the generator, with a December 2018 Wikipedia dump as the knowledge source."
+  },
+  {
+    "id": "rag-multi-hardware-and-index-size",
+    "question": "How many GPUs were the models trained on, and how many documents are in RAG's index?",
+    "gold_quotes": ["8, 32GB NVIDIA V100 GPUs", "to make a total of 21M documents"],
+    "match": "all",
+    "reference_answer": "8 NVIDIA V100 GPUs (32GB each), and an index of about 21 million documents."
+  },
+  {
+    "id": "t2050-approval-date",
+    "question": "When was the Transport 2050 10-Year Priorities plan approved?",
+    "gold_quotes": ["Approved on June 30, 2022"],
+    "reference_answer": "June 30, 2022."
+  },
+  {
+    "id": "t2050-equity-philosophy",
+    "question": "Which equity philosophy did the 10-Year Priorities equity analysis adopt?",
+    "gold_quotes": ["of minimizing gaps (in levels of access)"],
+    "reference_answer": "Minimizing gaps in levels of access between the general population and disadvantaged groups."
+  },
+  {
+    "id": "t2050-gondola-route",
+    "question": "Where would the Burnaby Mountain Gondola run?",
+    "gold_quotes": ["at Production Way in Burnaby up"],
+    "reference_answer": "From the SkyTrain system at Production Way in Burnaby up to the Simon Fraser University campus on Burnaby Mountain."
+  },
+  {
+    "id": "t2050-rapidbus-requirements",
+    "question": "What must municipalities commit to before new RapidBus service can be implemented?",
+    "gold_quotes": ["bus lanes and other bus priority measures to achieve travel times 20%"],
+    "reference_answer": "Bus lanes and other bus priority measures that make travel times 20% faster than local bus, with bus lanes on at least one-third of the route."
+  },
+  {
+    "id": "t2050-ubc-extension",
+    "question": "Why is extending SkyTrain to UBC a priority?",
+    "gold_quotes": ["UBC is the largest employment centre in the region without a"],
+    "reference_answer": "Bus service to UBC reaches full capacity at peak times in 2025, and UBC is the largest employment centre in the region without a rapid transit connection, with major growth planned along the corridor."
+  },
+  {
+    "id": "unanswerable-training-cost",
+    "question": "How much did it cost in dollars to train RAG?",
+    "answerable": false,
+    "reference_answer": "The documents do not say."
+  },
+  {
+    "id": "unanswerable-gpt4",
+    "question": "How does RAG compare with GPT-4 on Natural Questions?",
+    "answerable": false,
+    "reference_answer": "The documents do not say."
+  },
+  {
+    "id": "unanswerable-transit-pass-price",
+    "question": "What will a monthly transit pass cost in 2030 under Transport 2050?",
+    "answerable": false,
+    "reference_answer": "The documents do not say."
+  }
+]

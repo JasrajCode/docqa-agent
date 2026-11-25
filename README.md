@@ -59,6 +59,55 @@ All three LLM roles use one Claude model (`AGENT_MODEL`, Claude Haiku by default
 
 To trace runs, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env`. Each run then appears in LangSmith with every node's inputs, outputs, latency and token usage.
 
+## Evaluation
+
+`docqa-eval` runs the 27 questions in [evals/dataset.json](evals/dataset.json) through the agent and through a single-pass RAG baseline (one search, one LLM call, no review, which is roughly what DocQA does). Each answer is graded against a reference answer by an LLM judge, and every run is saved to [evals/results](evals/results).
+
+The questions cover facts, comparisons and numbers from the RAG paper, two multi-part questions that need two separate passages, five questions on the Transport 2050 documents (testing search across documents), and three questions the documents can't answer.
+
+| Metric | Meaning |
+|---|---|
+| Retrieval hit rate | Share of answerable questions where a retrieved chunk contains the gold passage. Gold passages are short exact quotes, matched ignoring case and line breaks, so the dataset survives re-chunking |
+| Citation hit rate | Same check, but only over the chunks the answer cites |
+| Correctness | Judge score against the reference answer: correct 1, partially correct 0.5, incorrect 0 |
+| Abstention accuracy | Share of unanswerable questions where the system says the documents don't cover it |
+| Fabricated citations | Share of answers citing a chunk that was never retrieved |
+| Review text leaked | Share of answers that talk about the review process ("the reviewer's flagged statement") instead of answering |
+
+**Results** (`claude-haiku-5-5`, 8 chunks per search for both systems, run `20261125-025221`):
+
+| Metric | Agent | Single pass |
+|---|---|---|
+| Retrieval hit rate | 79% | 75% |
+| Correctness (0-1) | 0.89 | 0.91 |
+| Fully correct | 85% | 85% |
+| Abstention accuracy | 100% | 100% |
+| Fabricated citations | 0% | 0% |
+| Reviewer approval | 100% | n/a |
+| Median latency | 9.2s | 3.4s |
+| Mean LLM calls | 3.15 | 1.00 |
+| Mean input tokens | 18,349 | 6,354 |
+
+**What the results say**
+
+- On single-fact questions the two systems tie. The planner leaves those questions whole, so the agent runs the same search, and the review step almost never changes the outcome (100% approval, 0.07 revisions on average).
+- The agent's advantage is multi-part questions. Splitting "how many GPUs, and how many documents in the index" into separate searches retrieved both facts; one search found only one.
+- That advantage costs about 3x the input tokens and LLM calls and 2.7x the latency.
+- The five questions both systems miss are retrieval failures: the right chunk isn't in the top 8 for either. The next improvement is retrieval quality, such as a reranker or hybrid keyword and vector search, rather than more agent steps.
+- The reviewer is a weak gate. It approved every draft in both runs, including an unreadable answer to `rag-decoding` in the first run that contained inline self-corrections (`[8f9bcf13-…] no, correctly: [204f950c-…]`, `[19ad? no]`) and a paragraph addressed to the reviewer itself. Two gaps explain this: the deterministic citation check only validates chunk ids listed in `claims`, not ids written inline in the answer, and the LLM reviewer judges whether claims are supported, not whether the answer is complete or well formed. For the same reason, an honest "the passages don't say" passes review even when retrieval missed the answer.
+
+**How the eval changed along the way.** The first full run (`20261125-024841`) favoured the baseline, but it gave the agent 4 chunks per search against the baseline's 8. Equalising that raised the agent's retrieval hit rate from 65% to 79%, and 8 is now the default. That run also had two answers fail schema validation, where the model put the claims list inside the answer text; switching from forced tool calling to Claude's native structured outputs fixed it. Earlier, the judge scored two nearly identical answers differently, which led to a clearer rubric for unanswerable questions. Reading that run's answers also showed that all three revised drafts addressed the reviewer ("On the reviewer's flagged statement...") instead of the user, because the rewrite request was phrased as a message from a reviewer. The writer is now told its answer goes straight to the user, the rewrite request is phrased as a plain instruction, and the leak is tracked as its own metric; six forced rewrites of those questions produced no leaks.
+
+**Limitations.** 27 questions is a small set: one question moves a rate by about 4 points, so small gaps are ties. Each number comes from a single run, and current Claude models don't accept a temperature setting, so reruns vary. The judge is the same model as the systems it grades, which can bias it toward their answers. The reviewer's 100% approval rate reflects how lenient it is, not answer quality, so it shouldn't be read as a quality guarantee.
+
+```bash
+uv run docqa-eval --check-dataset         # every gold quote exists in the corpus
+uv run docqa-eval                         # both systems, all questions
+uv run docqa-eval --systems agent --cases rag-variants t2050-gondola-route
+```
+
+A full run takes about two minutes and makes roughly 200 LLM calls. Results are written as each case finishes, so an interrupted run keeps its completed cases.
+
 ## Design decisions
 
 **Direct database access with a read-only role.** The server connects to DocQA's database as `docqa_agent_ro`, which can only `SELECT` from `Document` and `Chunk` ([sql/readonly_role.sql](sql/readonly_role.sql)). `Account` holds users' OAuth tokens, so the role can't see it. A test runs that exact SQL and confirms the role can't read `Account`, delete rows or create tables.
@@ -121,6 +170,9 @@ uv run pyright
 | `test_parity.py` | This server's search vs DocQA's retrieval on real data (skipped without credentials) |
 | `test_agent_graph.py` | Agent routing with scripted LLM responses: planning, follow-up searches, rewrites, the revision limit, fabricated citations |
 | `test_reasoner.py` | The reviewer's verdict is derived from its per-claim checks |
+| `test_eval_metrics.py` | Gold-quote matching (any/all, reflowed text), summary rates |
+| `test_eval_dataset.py` | The bundled dataset is valid; malformed cases are rejected |
+| `test_eval_systems.py` | The single-pass baseline and its fabricated-citation detection |
 | `test_agent_mcp.py` | The agent's MCP client against the real server, including a full agent run |
 | `test_agent_live.py` | One full run with real Claude calls (skipped without `ANTHROPIC_API_KEY`) |
 

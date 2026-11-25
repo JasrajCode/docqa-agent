@@ -31,5 +31,8 @@ class AgentSettings(BaseSettings):
 
     anthropic_api_key: SecretStr
     agent_model: str = "claude-haiku-5-5"
-    agent_search_k: int = 4
+    agent_search_k: int = 8  # k=4 cost 14 points of retrieval hit rate in evals
     agent_max_revisions: int = 2
+
+    eval_judge_model: str | None = None  # defaults to agent_model
+    eval_single_pass_k: int = 8

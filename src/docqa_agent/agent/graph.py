@@ -9,6 +9,7 @@ from langgraph.graph.state import CompiledStateGraph
 from docqa_agent.agent.reasoner import Reasoner
 from docqa_agent.agent.search import Searcher
 from docqa_agent.agent.state import AgentResult, AgentState, Citation, Draft, NextStep, Review
+from docqa_agent.models import ChunkHit
 
 INLINE_CITATION = re.compile(r"\[([^\[\]\s]+)\]")
 
@@ -21,6 +22,38 @@ def _claimed_ids(draft: Draft) -> list[str]:
     return _unique(chunk_id for claim in draft.claims for chunk_id in claim.chunk_ids)
 
 
+def build_result(
+    question: str,
+    draft: Draft,
+    evidence: dict[str, ChunkHit],
+    *,
+    review: Review | None,
+    revisions: int,
+    searches: list[str],
+) -> AgentResult:
+    """Resolves a draft's citations against the retrieved passages."""
+    cited = _unique([*INLINE_CITATION.findall(draft.answer), *_claimed_ids(draft)])
+    return AgentResult(
+        question=question,
+        answer=draft.answer,
+        citations=[
+            Citation(
+                chunk_id=cid,
+                document_title=evidence[cid].document_title,
+                chunk_index=evidence[cid].chunk_index,
+            )
+            for cid in cited
+            if cid in evidence
+        ],
+        approved=review.approved if review else None,
+        revisions=revisions,
+        searches=searches,
+        unsupported_claims=review.unsupported_claims if review and not review.approved else [],
+        invalid_citations=[cid for cid in _claimed_ids(draft) if cid not in evidence],
+        evidence=list(evidence.values()),
+    )
+
+
 def _need[T](value: T | None, key: str) -> T:
     if value is None:
         raise RuntimeError(f"agent state has no {key!r}; a node ran before the one that sets it")
@@ -31,7 +64,7 @@ def build_graph(
     reasoner: Reasoner,
     searcher: Searcher,
     *,
-    k: int = 4,
+    k: int = 8,
     max_revisions: int = 2,
     max_sub_questions: int = 4,
     max_follow_ups: int = 3,
@@ -81,29 +114,13 @@ def build_graph(
         }
 
     def finalize(state: AgentState) -> dict[str, Any]:
-        draft = _need(state.get("draft"), "draft")
-        review = _need(state.get("review"), "review")
-        evidence = state["evidence"]
-        cited = [
-            chunk_id
-            for chunk_id in _unique([*INLINE_CITATION.findall(draft.answer), *_claimed_ids(draft)])
-            if chunk_id in evidence
-        ]
-        result = AgentResult(
-            question=state["question"],
-            answer=draft.answer,
-            citations=[
-                Citation(
-                    chunk_id=cid,
-                    document_title=evidence[cid].document_title,
-                    chunk_index=evidence[cid].chunk_index,
-                )
-                for cid in cited
-            ],
-            approved=review.approved,
+        result = build_result(
+            state["question"],
+            _need(state.get("draft"), "draft"),
+            state["evidence"],
+            review=_need(state.get("review"), "review"),
             revisions=state["revisions"],
             searches=state["searched"],
-            unsupported_claims=[] if review.approved else review.unsupported_claims,
         )
         return {"result": result}
 

@@ -1,10 +1,9 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, SecretStr
 
+from docqa_agent.agent.llm import StructuredClaude, Usage
 from docqa_agent.agent.state import Draft, Plan, Review
 from docqa_agent.models import ChunkHit
 
@@ -16,7 +15,9 @@ it will be searched as written."""
 WRITER_PROMPT = """You answer questions using only the passages provided.
 Cite every factual statement inline with the chunk_id of a passage that supports it, \
 like [chunk_id]. If the passages do not answer the question, say so rather than guessing.
-In `claims`, list each factual statement from the answer with the chunk_ids that support it."""
+In `claims`, list each factual statement from the answer with the chunk_ids that support it.
+The answer is shown directly to the user. Never mention reviewers, feedback, revisions or \
+earlier drafts."""
 
 REVIEWER_PROMPT = """You check a draft answer against the passages it cites.
 Check every claim, in order. For each one, first name the cited passage that supports it or \
@@ -75,22 +76,14 @@ def format_evidence(evidence: Sequence[ChunkHit]) -> str:
 
 class AnthropicReasoner:
     def __init__(self, model: str, api_key: SecretStr, max_tokens: int = 2048) -> None:
-        # temperature is left unset: current Claude models reject the parameter.
-        self._llm = ChatAnthropic(
-            model_name=model,
-            api_key=api_key,
-            max_tokens_to_sample=max_tokens,
-            timeout=None,
-            stop=None,
-        )
+        self._claude = StructuredClaude(model, api_key, max_tokens)
+
+    @property
+    def usage(self) -> Usage:
+        return self._claude.usage
 
     async def _ask[T: BaseModel](self, schema: type[T], system: str, user: str) -> T:
-        result = await self._llm.with_structured_output(schema).ainvoke(
-            [SystemMessage(system), HumanMessage(user)]
-        )
-        if not isinstance(result, schema):
-            raise TypeError(f"expected {schema.__name__}, got {type(result).__name__}")
-        return result
+        return await self._claude.ask(schema, system, user)
 
     async def plan(self, question: str) -> Plan:
         return await self._ask(Plan, PLANNER_PROMPT, question)
@@ -102,8 +95,8 @@ class AnthropicReasoner:
         if feedback and feedback.unsupported_claims:
             flagged = "\n".join(f"- {claim}" for claim in feedback.unsupported_claims)
             parts.append(
-                "A reviewer found these statements unsupported by the passages. "
-                f"Remove them or support them with a passage:\n{flagged}"
+                "Write a new answer. These statements are not supported by the passages; "
+                f"leave them out unless a passage supports them:\n{flagged}"
             )
         return await self._ask(Draft, WRITER_PROMPT, "\n\n".join(parts))
 

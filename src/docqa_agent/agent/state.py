@@ -53,10 +53,12 @@ class AgentResult(BaseModel):
     question: str
     answer: str
     citations: list[Citation]
-    approved: bool
+    approved: bool | None  # None when no review step ran
     revisions: int
     searches: list[str]
     unsupported_claims: list[str]
+    invalid_citations: list[str]  # cited chunk_ids that were never retrieved
+    evidence: list[ChunkHit]
 
 
 def merge_evidence(current: dict[str, ChunkHit], new: dict[str, ChunkHit]) -> dict[str, ChunkHit]:
