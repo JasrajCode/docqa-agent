@@ -2,7 +2,7 @@
 
 A read-only [MCP](https://modelcontextprotocol.io) server that lets any MCP client, such as Claude Code, Claude Desktop or your own agent, search the PDF documents indexed by [DocQA](https://github.com/JasrajCode/docqa).
 
-It reads the same Postgres + pgvector tables that DocQA writes, so an AI assistant gets DocQA's semantic search as a set of tools it can call.
+It reads the same Postgres + pgvector tables that DocQA writes, so an AI assistant gets DocQA's semantic search as a set of tools it can call. The repo also includes `docqa-ask`, a LangGraph agent that answers questions through the server and has every claim checked against its sources.
 
 ```
 Claude Code / Claude Desktop / your agent
@@ -24,6 +24,41 @@ Claude Code / Claude Desktop / your agent
 
 All three are marked read-only, and results come back as structured JSON validated by pydantic models.
 
+## Agent
+
+`docqa-ask` answers a question with a LangGraph workflow that runs on top of the MCP server:
+
+```mermaid
+graph TD
+    question([question]) --> planner
+    planner --> retriever
+    retriever --> writer
+    writer --> reviewer
+    reviewer -. approved, or revision limit reached .-> finalize
+    reviewer -. unsupported claims, with follow-up searches .-> retriever
+    reviewer -. unsupported claims, no new searches .-> writer
+    finalize --> answer([answer with citations])
+```
+
+| Node | Role |
+|---|---|
+| `planner` | LLM. Splits the question into up to 4 search queries, or none if it can be searched as written |
+| `retriever` | No LLM. Runs the queries through the server's `search_documents` tool in parallel and merges the passages |
+| `writer` | LLM. Drafts an answer citing passages inline by `chunk_id`, and lists each claim with its sources |
+| `reviewer` | Rejects citations of passages that were never retrieved without calling the LLM. Otherwise an LLM checks each claim against its passages, reasoning before each verdict, and can request follow-up searches. Approval is computed in code from the per-claim checks, so it can't contradict them |
+| `finalize` | Resolves citations to document titles and records whether the reviewer approved |
+
+The reviewer can send a draft back at most twice (`AGENT_MAX_REVISIONS`), so a run makes 3 to 7 LLM calls. When the limit is reached, the answer is returned with its unsupported claims listed.
+
+```bash
+uv run docqa-ask "Which datasets were used to evaluate RAG?"
+uv run docqa-ask --json "Which datasets were used to evaluate RAG?"
+```
+
+All three LLM roles use one Claude model (`AGENT_MODEL`, Claude Haiku by default) with pydantic-validated structured outputs. The agent reaches the server through mcp's own client over a single stdio session per run. `langchain-mcp-adapters` was the original plan, but it requires mcp below 2.0 and this server is built on mcp 2.
+
+To trace runs, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env`. Each run then appears in LangSmith with every node's inputs, outputs, latency and token usage.
+
 ## Design decisions
 
 **Direct database access with a read-only role.** The server connects to DocQA's database as `docqa_agent_ro`, which can only `SELECT` from `Document` and `Chunk` ([sql/readonly_role.sql](sql/readonly_role.sql)). `Account` holds users' OAuth tokens, so the role can't see it. A test runs that exact SQL and confirms the role can't read `Account`, delete rows or create tables.
@@ -41,7 +76,7 @@ All three are marked read-only, and results come back as structured JSON validat
    uv sync
    ```
 2. Create the read-only role by running [sql/readonly_role.sql](sql/readonly_role.sql) in Neon's SQL editor, after replacing the password and database name.
-3. Copy `.env.example` to `.env` and fill it in. Use Neon's pooled connection string with the `docqa_agent_ro` credentials, not DocQA's main ones.
+3. Copy `.env.example` to `.env` and fill it in. Use Neon's pooled connection string with the `docqa_agent_ro` credentials, not DocQA's main ones. `ANTHROPIC_API_KEY` is only needed for `docqa-ask`.
 
 ## Connect it to Claude
 
@@ -84,6 +119,10 @@ uv run pyright
 | `test_embeddings.py` | Same model, dimensions and preprocessing as DocQA |
 | `test_config_and_db.py` | Config parsing, secret masking, Neon URL handling |
 | `test_parity.py` | This server's search vs DocQA's retrieval on real data (skipped without credentials) |
+| `test_agent_graph.py` | Agent routing with scripted LLM responses: planning, follow-up searches, rewrites, the revision limit, fabricated citations |
+| `test_reasoner.py` | The reviewer's verdict is derived from its per-claim checks |
+| `test_agent_mcp.py` | The agent's MCP client against the real server, including a full agent run |
+| `test_agent_live.py` | One full run with real Claude calls (skipped without `ANTHROPIC_API_KEY`) |
 
 CI runs lint, format check, type check and tests on every push and pull request.
 

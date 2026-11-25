@@ -1,4 +1,12 @@
 import math
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import asyncpg
+from mcp.server.mcpserver import MCPServer
+
+from docqa_agent.repository import Repository
+from docqa_agent.server import AppContext, create_server
 
 DIMS = 1536
 
@@ -35,3 +43,13 @@ class FakeEmbedder:
 
 def fake_embedder() -> FakeEmbedder:
     return FakeEmbedder({QUERY: basis(0)})
+
+
+def make_test_server(pool: asyncpg.Pool) -> MCPServer[AppContext]:
+    """The real MCP server, backed by the test database and a fake embedder."""
+
+    @asynccontextmanager
+    async def deps() -> AsyncIterator[AppContext]:
+        yield AppContext(Repository(pool, IN_SCOPE), fake_embedder())
+
+    return create_server(deps)

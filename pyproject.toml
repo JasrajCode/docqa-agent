@@ -1,20 +1,25 @@
 [project]
 name = "docqa-agent"
 version = "0.1.0"
-description = "Read-only MCP server that exposes DocQA's pgvector document corpus to any MCP client"
+description = "Read-only MCP server over DocQA's pgvector corpus, plus a LangGraph agent that answers with checked citations"
 readme = "README.md"
 authors = [{ name = "Jasraj Gosal" }]
 requires-python = ">=3.12"
 dependencies = [
     "asyncpg>=0.32.0",
+    "langchain-anthropic>=1.7.12",
+    "langchain-core>=1.8.4",
+    "langgraph>=1.2.24",
     "mcp>=2.3.0",
     "openai>=3.58.0",
     "pydantic>=2.14.4",
     "pydantic-settings>=2.16.3",
+    "python-dotenv>=1.2.4",
 ]
 
 [project.scripts]
 docqa-mcp = "docqa_agent.server:main"
+docqa-ask = "docqa_agent.agent.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.13.9,<0.14.0"]

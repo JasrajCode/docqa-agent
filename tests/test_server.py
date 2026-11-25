@@ -1,22 +1,10 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-
 import asyncpg
 from jsonschema import Draft202012Validator
 from mcp.client import Client
 from mcp_types import CallToolResult, TextContent
 
-from docqa_agent.repository import Repository
-from docqa_agent.server import AppContext, create_server
-from tests.support import IN_SCOPE, QUERY, fake_embedder
-
-
-def _server(pool: asyncpg.Pool):
-    @asynccontextmanager
-    async def deps() -> AsyncIterator[AppContext]:
-        yield AppContext(Repository(pool, IN_SCOPE), fake_embedder())
-
-    return create_server(deps)
+from tests.support import QUERY
+from tests.support import make_test_server as _server
 
 
 def _text(result: CallToolResult) -> str:

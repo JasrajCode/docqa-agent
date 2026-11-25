@@ -24,3 +24,12 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [part.strip() for part in value.split(",") if part.strip()]
         return value
+
+
+class AgentSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    anthropic_api_key: SecretStr
+    agent_model: str = "claude-haiku-5-5"
+    agent_search_k: int = 4
+    agent_max_revisions: int = 2
