@@ -22,6 +22,7 @@ class Usage:
 class TruncatedOutputError(RuntimeError):
     """The model hit max_tokens, so its structured output is incomplete."""
 
+
 DEFAULT_MAX_TOKENS = 8192
 
 
