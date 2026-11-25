@@ -19,11 +19,20 @@ class Usage:
             self.output_tokens += message.usage_metadata["output_tokens"]
 
 
+class TruncatedOutputError(RuntimeError):
+    """The model hit max_tokens, so its structured output is incomplete."""
+
+DEFAULT_MAX_TOKENS = 8192
+
+
 class StructuredClaude:
     """Claude calls that return pydantic models, with token usage recorded per instance."""
 
-    def __init__(self, model: str, api_key: SecretStr, max_tokens: int = 2048) -> None:
+    def __init__(
+        self, model: str, api_key: SecretStr, max_tokens: int = DEFAULT_MAX_TOKENS
+    ) -> None:
         self.model = model
+        self.max_tokens = max_tokens
         self.usage = Usage()
         # temperature is left unset: current Claude models reject the parameter.
         self._llm = ChatAnthropic(
@@ -44,7 +53,12 @@ class StructuredClaude:
             dict[str, Any],
             await structured.ainvoke([SystemMessage(system), HumanMessage(user)]),
         )
-        self.usage.record(response["raw"])
+        raw: AIMessage = response["raw"]
+        self.usage.record(raw)
+        if raw.response_metadata.get("stop_reason") == "max_tokens":
+            raise TruncatedOutputError(
+                f"{schema.__name__} output was cut off at the {self.max_tokens}-token limit"
+            )
         if response["parsing_error"] is not None:
             raise response["parsing_error"]
         parsed = response["parsed"]

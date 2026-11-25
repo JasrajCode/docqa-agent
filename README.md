@@ -135,19 +135,21 @@ The questions cover facts, comparisons and numbers from the RAG paper, two multi
 | Fabricated citations | Share of answers citing a chunk that was never retrieved |
 | Review text leaked | Share of answers that talk about the review process ("the reviewer's flagged statement") instead of answering |
 
-**Results** (`claude-haiku-5-5`, 8 chunks per search for both systems, run `20261125-025221`):
+**Results** from a single run over 27 questions (`claude-haiku-5-5`, 8 chunks per search for both systems, run `20261125-025221`). Counts are shown next to rates because one question is worth about 4 points:
 
 | Metric | Agent | Single pass |
 |---|---|---|
-| Retrieval hit rate | 79% | 75% |
+| Retrieval hit rate | 79% (19 of 24) | 75% (18 of 24) |
 | Correctness (0-1) | 0.89 | 0.91 |
-| Fully correct | 85% | 85% |
-| Abstention accuracy | 100% | 100% |
+| Fully correct | 85% (23 of 27) | 85% (23 of 27) |
+| Abstention accuracy | 100% (3 of 3) | 100% (3 of 3) |
 | Fabricated citations | 0% | 0% |
 | Reviewer approval | 100% | n/a |
 | Median latency | 9.2s | 3.4s |
 | Mean LLM calls | 3.15 | 1.00 |
 | Mean input tokens | 18,349 | 6,354 |
+
+On accuracy the two systems are tied: they get the same 23 questions fully right, and the retrieval gap is a single question. The differences that are large enough to mean something are cost and latency.
 
 **What the results say**
 

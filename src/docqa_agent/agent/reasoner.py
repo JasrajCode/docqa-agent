@@ -3,7 +3,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field, SecretStr
 
-from docqa_agent.agent.llm import StructuredClaude, Usage
+from docqa_agent.agent.llm import DEFAULT_MAX_TOKENS, StructuredClaude, Usage
 from docqa_agent.agent.state import Draft, Plan, Review
 from docqa_agent.models import ChunkHit
 
@@ -75,7 +75,9 @@ def format_evidence(evidence: Sequence[ChunkHit]) -> str:
 
 
 class AnthropicReasoner:
-    def __init__(self, model: str, api_key: SecretStr, max_tokens: int = 2048) -> None:
+    def __init__(
+        self, model: str, api_key: SecretStr, max_tokens: int = DEFAULT_MAX_TOKENS
+    ) -> None:
         self._claude = StructuredClaude(model, api_key, max_tokens)
 
     @property
