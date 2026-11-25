@@ -4,6 +4,10 @@ A read-only [MCP](https://modelcontextprotocol.io) server that lets any MCP clie
 
 It reads the same Postgres + pgvector tables that DocQA writes, so an AI assistant gets DocQA's semantic search as a set of tools it can call. On top of the server sits a LangGraph agent that answers questions and has every claim checked against its sources. The agent is available as a CLI (`docqa-ask`) and as a rate-limited HTTP API that streams its progress, packaged with Docker and deployed on Render.
 
+**Live API:** https://docqa-agent.onrender.com (interactive docs; on Render's free tier the first request after 15 idle minutes takes about a minute while the service wakes)
+
+![The agent answering a two-part question: the planner splits it into two searches, the reviewer approves the draft, and the answer cites numbered sources](docs/demo.gif)
+
 ```mermaid
 graph TD
     client([Browser or curl]) -- "HTTPS, Server-Sent Events" --> api
@@ -76,7 +80,9 @@ To trace runs, set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env`. E
 | `POST /ask/stream` | Same run, streamed as Server-Sent Events: a `progress` event as each node finishes, then a `result` event (or an `error` event) |
 
 ```bash
-curl -N -X POST https://YOUR-SERVICE.onrender.com/ask/stream   -H "content-type: application/json"   -d '{"question": "What datasets does the RAG paper evaluate on?"}'
+curl -N -X POST https://docqa-agent.onrender.com/ask/stream \
+  -H "content-type: application/json" \
+  -d '{"question": "What datasets does the RAG paper evaluate on?"}'
 ```
 
 ```
