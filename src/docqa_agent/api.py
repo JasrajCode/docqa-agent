@@ -9,6 +9,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, Field
 
@@ -129,6 +130,10 @@ def create_app(services_factory: ServicesFactory, settings: ApiSettings) -> Fast
             k=services.search_k,
             max_revisions=services.max_revisions,
         )
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
 
     @app.get("/health")
     async def health() -> dict[str, str]:

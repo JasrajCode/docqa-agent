@@ -55,6 +55,14 @@ def test_health() -> None:
         assert c.get("/health").json() == {"status": "ok"}
 
 
+def test_root_redirects_to_the_interactive_docs() -> None:
+    with client() as c:
+        response = c.get("/", follow_redirects=False)
+        assert response.status_code == 307
+        assert response.headers["location"] == "/docs"
+        assert "/" not in c.get("/openapi.json").json()["paths"]
+
+
 def test_ask_returns_an_answer_with_resolved_citations_and_no_raw_evidence() -> None:
     with client() as c:
         response = ask(c)
