@@ -9,7 +9,8 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, Field
 
@@ -18,9 +19,21 @@ from docqa_agent.agent.reasoner import AnthropicReasoner, Reasoner
 from docqa_agent.agent.search import Searcher, connect
 from docqa_agent.agent.state import AgentResult, Citation, Progress
 from docqa_agent.config import AgentSettings, ApiSettings
+from docqa_agent.docs_theme import DARK_THEME_CSS
 from docqa_agent.server import create_server
 
 logger = logging.getLogger(__name__)
+
+API_DESCRIPTION = """
+Answers questions about the DocQA documents with a LangGraph agent that checks every citation.
+Rate limited per client and per day.
+
+> **"Failed to fetch" or "NetworkError" in Try it out?** An ad blocker such as uBlock Origin
+> is blocking the request. Allow this site in the blocker, or run the curl command shown after
+> each request.
+
+The service sleeps when idle, so the first request after a quiet period can take about a minute.
+"""
 
 
 @dataclass
@@ -106,12 +119,10 @@ def create_app(services_factory: ServicesFactory, settings: ApiSettings) -> Fast
 
     app = FastAPI(
         title="docqa-agent",
-        description=(
-            "Answers questions about the DocQA documents with a LangGraph agent that "
-            "checks every citation. Rate limited per client and per day."
-        ),
+        description=API_DESCRIPTION,
         version="0.1.0",
         lifespan=lifespan,
+        docs_url=None,  # replaced below by the themed page
     )
     limiter = RateLimiter(settings.rate_limit_per_hour, settings.daily_question_cap)
 
@@ -130,6 +141,16 @@ def create_app(services_factory: ServicesFactory, settings: ApiSettings) -> Fast
             k=services.search_k,
             max_revisions=services.max_revisions,
         )
+
+    @app.get("/docs", include_in_schema=False)
+    async def docs() -> HTMLResponse:
+        page = get_swagger_ui_html(openapi_url=app.openapi_url or "/openapi.json", title=app.title)
+        themed = (
+            bytes(page.body)
+            .decode()
+            .replace("</head>", f"<style>{DARK_THEME_CSS}</style></head>", 1)
+        )
+        return HTMLResponse(themed)
 
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:

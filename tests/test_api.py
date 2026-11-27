@@ -55,6 +55,16 @@ def test_health() -> None:
         assert c.get("/health").json() == {"status": "ok"}
 
 
+def test_docs_page_is_dark_themed_and_warns_about_ad_blockers() -> None:
+    with client() as c:
+        page = c.get("/docs")
+        description = c.get("/openapi.json").json()["info"]["description"]
+    assert page.status_code == 200
+    assert "swagger-ui" in page.text
+    assert "background: #1b1b1b" in page.text
+    assert "uBlock Origin" in description
+
+
 def test_root_redirects_to_the_interactive_docs() -> None:
     with client() as c:
         response = c.get("/", follow_redirects=False)
